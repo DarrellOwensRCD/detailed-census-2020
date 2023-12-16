@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Add a polygon to a map using a GeoJSON source</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.js"></script>
+  <script
+    type="text/javascript"
+    src="/js/lib/dummy.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/result-light.css">
+
+      <script type="text/javascript" src="https://api.tiles.mapbox.com/mapbox-gl-js/v2.3.1/mapbox-gl.js"></script>
+      <link rel="stylesheet" type="text/css" href="https://api.tiles.mapbox.com/mapbox-gl-js/v2.3.1/mapbox-gl.css">
+
+  <style id="compiled-css" type="text/css">
+      
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      h2,
+      h3 {
+        margin: 10px;
+        font-size: 1.2em;
+      }
+      h3 {
+        font-size: 1em;
+      }
+      p {
+        font-size: 0.85em;
+        margin: 10px;
+        text-align: left;
+      }
+      .map-overlay {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.8);
+        margin-right: 20px;
+        font-family: Arial, sans-serif;
+        overflow: auto;
+        border-radius: 3px;
+      }
+      #map {
+        position: absolute;
+        top: 47px;
+        bottom: 0;
+        width: 100%;
+      }
+      #features {
+        top: 0;
+        height: 220px;
+        margin-top: 110px;
+        width: 250px;
+      }
+      #layerpicker {
+        top: 0;
+        left: 0;
+        margin-top: 5px;
+        width: 250px;
+      }
+      #legend {
+          padding: 10px;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+          line-height: 18px;
+          margin-bottom: 40px;
+          width: 200px;
+      }
+      .legend-key {
+        display: inline-block;
+        border-radius: 20%;
+        width: 10px;
+        height: 10px;
+        margin-right: 5px;
+      }
+    /* EOS */
+  </style>
+
+  <script id="insert"></script>
+</head>
+<body>
+<div id="map"></div>
+<div class="map-overlay" id="features">
+  <select id='layerpicker'>
+    <option disabled = "disabled" style="color:gray" >2020 People Data</option>
+    <option value="1292">African American</option>
+    <option value="1113">Europeans</option>
+    <option value="3822">Chinese</option>
+    <option value="1184">Arab</option>
+    <option value="2562">Alaska Native</option>
+  </div>
+</div>
+<script src="fetchcountycsv.js"></script>
+<script src="fetchrecipecsv.js"></script>
+<script>
+    //Domain restricted token 
+    mapboxgl.accessToken = 'pk.eyJ1IjoiaWRvdGhldGhpbmtpbmciLCJhIjoiY2xwcnFsYXhxMDllbjJqbHJ3c3Bubmc0dSJ9.p6CsmfrL9dq7GvgFyjMVtA';
+    const map = new mapboxgl.Map({
+        container: 'map', // container ID
+        // Choose from Mapbox's core styles, or make your own style with Mapbox Studio
+        style: 'mapbox://styles/mapbox/light-v11', // style URL
+        center: [-68.137343, 45.137451], // starting position
+        zoom: 5 // starting zoom
+    });
+    //Load the map
+    map.on('load', () => {
+        console.log("Map loaded");
+    });
+    //Get a dictionary containing a ethnic group and a list of counties this ethnic ID is associated with
+    countyDictionary=fetchcountyCSV();
+    // Use recipe to determine which county is in which source file
+    recipeDictionary=fetchrecipeCSV()
+    // Load all Sources
+    // and add all county numbers "county_" + NUMBER
+    const selectElement = document.querySelector('#layerpicker');
+    fetchcountyCSV().then(data => {
+        countyDictionary = data;
+        return fetchrecipeCSV();
+    }).then(data => {
+        recipeDictionary = data;
+        selectElement.addEventListener('change', (event) => {
+            selectedLayer = event.target.value
+            //All counties ethnic ID is located in. Iterate thru them and construct the tilesetID incorporating the recipe ID used for the tilesetID
+            const listofcountyIDs=countyDictionary[selectedLayer];
+            const listofsourceFileIDs = [];
+            for(let i = 0; i < listofcountyIDs.length; i++){
+                const sourceFileIDs= 'idothethinking.county20ethnicdemo' + String(recipeDictionary[String( listofcountyIDs[i])]);
+                if (!listofsourceFileIDs.includes(sourceFileIDs.trim())){
+                  listofsourceFileIDs.push(sourceFileIDs.trim());
+                }
+            }
+            //Iterate through all sources from 'listofsourceFileIDs, add them and then add county layers from from 'listofcountyIDs' 
+            for(let i = 0; i < listofsourceFileIDs.length; i++){
+              const tilesetName = 'tilesetData' + listofsourceFileIDs[i].replace(new RegExp("idothethinking.county20ethnicdemo", 'g'),'');
+              map.addSource(tilesetName.trim(), {
+                  "url": "mapbox://" + listofsourceFileIDs[i],
+                  "type": "vector"
+              });
+            }
+            for(let i = 0; i < listofcountyIDs.length; i++){
+              const tilesetName=  'tilesetData' + recipeDictionary[listofcountyIDs[i]];
+              const layerName= "county_" + listofcountyIDs[i];
+              const layerID = "polygon_" + listofcountyIDs[i];
+              //Style by national ethnc share or percent of state pop
+              // Lets style with national share as a test
+              ethnic_share = selectedLayer + '_national_share'
+              map.addLayer({
+                  id: layerID,
+                  type: 'fill',
+                  'source' : tilesetName.trim(),
+                  'source-layer': layerName,
+                  'layout': {},
+                  'paint': {
+                  'fill-color': [
+                    'interpolate',
+                    ['linear'],
+                    ['get', ethnic_share],
+                    0,
+                    "#ffffff",
+                    1,
+                    "#f74040"],
+                  'fill-opacity': 0.5
+                  }
+              });
+            }
+        });
+     });
+</script>
+
+</body>
+</html>
