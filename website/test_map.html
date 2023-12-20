@@ -95,7 +95,6 @@
 <script src="fetchcountycsv.js"></script>
 <script src="fetchrecipecsv.js"></script>
 <script>
-    //Domain restricted token 
     mapboxgl.accessToken = 'pk.eyJ1IjoiaWRvdGhldGhpbmtpbmciLCJhIjoiY2xwcnFsYXhxMDllbjJqbHJ3c3Bubmc0dSJ9.p6CsmfrL9dq7GvgFyjMVtA';
     const map = new mapboxgl.Map({
         container: 'map', // container ID
@@ -106,7 +105,15 @@
     });
     //Load the map
     map.on('load', () => {
-        console.log("Map loaded");
+        for(let i = 0; i < 162; i++){
+          const nthFile = (i == 161) ? "last" : String(i);
+          const tilesetName = 'tilesetData' + nthFile;
+          map.addSource(tilesetName, {
+              "url": "mapbox://idothethinking.county20ethnicdemo" + nthFile,
+              "type": "vector"
+          });
+        }
+        console.log("Map loaded with all sources");
     });
     //Get a dictionary containing a ethnic group and a list of counties this ethnic ID is associated with
     countyDictionary=fetchcountyCSV();
@@ -131,14 +138,7 @@
                   listofsourceFileIDs.push(sourceFileIDs.trim());
                 }
             }
-            //Iterate through all sources from 'listofsourceFileIDs, add them and then add county layers from from 'listofcountyIDs' 
-            for(let i = 0; i < listofsourceFileIDs.length; i++){
-              const tilesetName = 'tilesetData' + listofsourceFileIDs[i].replace(new RegExp("idothethinking.county20ethnicdemo", 'g'),'');
-              map.addSource(tilesetName.trim(), {
-                  "url": "mapbox://" + listofsourceFileIDs[i],
-                  "type": "vector"
-              });
-            }
+            //Add them and then add county layers from from 'listofcountyIDs' 
             for(let i = 0; i < listofcountyIDs.length; i++){
               const tilesetName=  'tilesetData' + recipeDictionary[listofcountyIDs[i]];
               const layerName= "county_" + listofcountyIDs[i];
